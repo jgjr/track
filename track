@@ -1,0 +1,308 @@
+#!/usr/bin/env python
+# A time tracking script
+
+from datetime import datetime, timedelta
+import sys
+import os
+import json
+
+# The name of the tracking file initialized in each directory
+trackingFile = ".tracking.json"
+
+
+class FileError(Exception):
+    pass
+
+
+class TimeError(Exception):
+    pass
+
+
+# The class that handles each time tracking period
+class Session():
+    def __init__(self, label=""):
+        self.start = ""
+        self.end = ""
+        self.label = label
+
+    # Returns the start and end times as strings, and the label
+    def output(self):
+        if isinstance(self.start, datetime):
+            start = self.start.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            start = self.start
+        if isinstance(self.end, datetime):
+            end = self.end.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            end = self.end
+        return {"start": start, "end": end, "label": self.label}
+
+    # Converts times as strings to datetime objects
+    def load(self, data):
+        try:
+            self.start = datetime.strptime(data["start"], "%Y-%m-%d %H:%M:%S")
+        # Each session must have at least a valid start time
+        except ValueError:
+            error("Invalid start time for instance ({})".format(data["start"]))
+        try:
+            self.end = datetime.strptime(data["end"], "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            self.end = ""
+        self.label = data["label"]
+
+    def startSession(self):
+        self.start = datetime.now()
+
+    def endSession(self):
+        if isinstance(self.end, datetime):
+            raise TimeError("Session already ended")
+        end = datetime.now()
+        # If the sessions extended over multiple days
+        if end.__format__("%Y-%m-%d") > self.start.__format__("%Y-%m-%d"):
+            newSessions = self.endMultipleDaySession(end)
+            return newSessions
+        else:
+            self.end = datetime.now()
+            return []
+
+    # Ends the session on the day it was created and
+    # creates as many as necessary to reach the end time
+    def endMultipleDaySession(self, end):
+        sessions = []
+        # End the current session at 1 second before midnight
+        self.end = self.start.replace(
+            hour=23, minute=59,
+            second=59, microsecond=999)
+        start = self.start.replace(
+            hour=00, minute=00, second=00,
+            microsecond=000)
+        i = 1
+        start += timedelta(days=i)
+        while start.__format__("%Y-%m-%d") <= end.__format__("%Y-%m-%d"):
+            session = Session(self.label)
+            sessions.append(session)
+            session.start = start
+            session.end = start.replace(
+                hour=23, minute=59, second=59,
+                microsecond=999)
+            i += 1
+            start += timedelta(days=1)
+        # The last session needs an end time of now
+        sessions[-1].end = end
+        return sessions
+
+    def getDuration(self):
+        # Raises an error if the session has not ended
+        if not isinstance(self.end, datetime):
+            raise TimeError("Session has not ended")
+        else:
+            return self.end - self.start
+
+
+# The class that handles all of the instances tracked
+class Tracker():
+    def __init__(self):
+        # a list of Session instances
+        self.times = []
+
+    def output(self):
+        # Convert the start & end time of each session to a string
+        times = [time.output() for time in self.times]
+        return {"times": times}
+
+    # Load the sessions read from the tracking file
+    def load(self, data):
+        for time in data["times"]:
+            session = Session()
+            session.load(time)
+            self.times.append(session)
+
+    def start(self, label=""):
+        # Does not allow two active sessions, the last one must have ended
+        if (len(self.times) > 0 and
+                not isinstance(self.times[-1].end, datetime)):
+            raise TimeError("The last session has not ended")
+        else:
+            session = Session(label)
+            session.startSession()
+            self.times.append(session)
+
+    def end(self):
+        try:
+            # If the session extended over multiple days
+            # it will return an array of new sessions
+            newSessions = self.times[-1].endSession()
+        # Cannot end a session that has already ended
+        except TimeError as e:
+            raise TimeError("The last session has already ended")
+        if len(newSessions):
+            self.times.extend(newSessions)
+
+    # Get the total time tracked on each day that has one or more sessions
+    def getDays(self):
+        days = {}
+        for time in self.times:
+            try:
+                duration = time.getDuration()
+            except TimeError as e:
+                error(e)
+            day = time.start.__format__("%Y-%m-%d")
+            if day in days:
+                days[day] += duration
+            else:
+                days[day] = duration
+        for day in days:
+            days[day] = str(days[day]).split(".")[0]
+        return days
+
+    # Get the total time tracked on all days
+    def getTotal(self):
+        total = timedelta(0)
+        for time in self.times:
+            total += (time.end - time.start)
+        return str(total).split(".")[0]
+
+
+def error(message):
+    print(message)
+    sys.exit(1)
+
+
+def success(message):
+    print(message)
+    sys.exit(0)
+
+
+# Create a tracking file only if one does not already exist
+def init():
+    if os.path.isfile(trackingFile):
+        raise FileError("Tracking file already exists")
+    with open(trackingFile, "w") as newFile:
+        json.dump({"times": []}, newFile, indent=4)
+
+
+# Open the tracking file if it exists and return the data
+def read():
+    if not os.path.isfile(trackingFile):
+        raise FileError("Tracking file does not exist")
+    with open(trackingFile, "r") as readFile:
+        return json.load(readFile)
+
+
+# Write data in json format to the specified file
+def store(data, file):
+    if not os.path.isfile(file):
+        raise FileError("Tracking file does not exist")
+    with open(file, "w") as writeFile:
+        json.dump(data, writeFile, indent=4)
+
+
+# Output the total for each day tracked and the grand total to the console
+def show(days, total):
+    print("\nDays:")
+    for day, duration in days.items():
+        print("{} - {}".format(day, duration))
+    print("\nTotal:\n{}\n".format(total))
+
+
+# Export the total for each day tracked and the grand total to a file
+def export(days, total, file):
+    if os.path.isfile(file):
+        raise FileError("Export file already exists")
+    with open(file, "w") as writeFile:
+        writeFile.write("Days:\n")
+        for day, duration in days.items():
+            writeFile.write("{} - {}\n".format(day, duration))
+        writeFile.write("\n")
+        writeFile.write("Total:\n{}\n".format(total))
+
+
+commands = ["start", "stop", "init", "clear", "show", "export"]
+# Only accepts one of these arguments
+if len(sys.argv) < 2 or sys.argv[1] not in commands:
+    error("""
+    Usage:
+    init - initialize time tracking file
+    start <label>(optional) - start tracking time
+    stop - stop tracking time
+    clear - clear all tracked times
+    show - show the daily totals for tracked times
+    export <filename> - export the totals to a specified file
+    """)
+
+if sys.argv[1] == "init":
+    try:
+        init()
+    # If the tracking file already exists return the error
+    except FileError as e:
+        error(e)
+    success("initialized")
+
+elif sys.argv[1] == "start":
+    try:
+        data = read()
+    # If the tracking file doesn't exist return the error
+    except FileError as e:
+        error(e)
+    tracker = Tracker()
+    tracker.load(data)
+    if len(sys.argv) > 2:
+        label = sys.argv[2]
+    else:
+        label = ""
+    try:
+        tracker.start(label)
+    # If the last session had not ended
+    except TimeError as e:
+        error(e)
+    store(tracker.output(), trackingFile)
+    success("started")
+
+elif sys.argv[1] == "stop":
+    try:
+        data = read()
+    except FileError as e:
+        error(e)
+    tracker = Tracker()
+    tracker.load(data)
+    try:
+        tracker.end()
+    # If the last session has already ended
+    except TimeError as e:
+        error(e)
+    store(tracker.output(), trackingFile)
+    success("stopped")
+
+# Clear the tracking file altogether
+elif sys.argv[1] == "clear":
+    try:
+        store({"times": []}, trackingFile)
+    except FileError as e:
+        error(e)
+    success("Cleared")
+
+elif sys.argv[1] == "show":
+    try:
+        data = read()
+    except FileError as e:
+        error(e)
+    tracker = Tracker()
+    tracker.load(data)
+    show(tracker.getDays(), tracker.getTotal())
+
+elif sys.argv[1] == "export":
+    # Has a mandatory second argument - filename
+    if len(sys.argv) < 3:
+        error("Filename needed")
+    try:
+        data = read()
+    except FileError as e:
+        error(e)
+    tracker = Tracker()
+    tracker.load(data)
+    try:
+        export(tracker.getDays(), tracker.getTotal(), sys.argv[2])
+    except FileError as e:
+        error(e)
+    success("Exported")
+
