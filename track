@@ -90,8 +90,9 @@ class Session():
         # The last session needs an end time of now
         sessions[-1].end = end
         return sessions
-
-    def getDuration(self):
+    
+    @property
+    def duration(self):
         # Raises an error if the session has not ended
         if not isinstance(self.end, datetime):
             raise TimeError("Session has not ended")
@@ -139,11 +140,12 @@ class Tracker():
             self.times.extend(newSessions)
 
     # Get the total time tracked on each day that has one or more sessions
-    def getDays(self):
+    @property
+    def days(self):
         days = {}
         for time in self.times:
             try:
-                duration = time.getDuration()
+                duration = time.duration
             except TimeError as e:
                 error(e)
             day = time.start.__format__("%Y-%m-%d")
@@ -156,7 +158,8 @@ class Tracker():
         return days
 
     # Get the total time tracked on all days
-    def getTotal(self):
+    @property
+    def total(self):
         total = timedelta(0)
         for time in self.times:
             total += (time.end - time.start)
@@ -288,7 +291,7 @@ elif sys.argv[1] == "show":
         error(e)
     tracker = Tracker()
     tracker.load(data)
-    show(tracker.getDays(), tracker.getTotal())
+    show(tracker.days, tracker.total)
 
 elif sys.argv[1] == "export":
     # Has a mandatory second argument - filename
@@ -301,7 +304,7 @@ elif sys.argv[1] == "export":
     tracker = Tracker()
     tracker.load(data)
     try:
-        export(tracker.getDays(), tracker.getTotal(), sys.argv[2])
+        export(tracker.days, tracker.total, sys.argv[2])
     except FileError as e:
         error(e)
     success("Exported")
