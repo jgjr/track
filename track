@@ -18,15 +18,15 @@ class TimeError(Exception):
     pass
 
 
-# The class that handles each time tracking period
 class Session():
+    """The class that handles each time tracking period"""
     def __init__(self, label=""):
         self.start = ""
         self.end = ""
         self.label = label
 
-    # Returns the start and end times as strings, and the label
     def output(self):
+        """Returns the start and end times as strings, and the label"""
         if isinstance(self.start, datetime):
             start = self.start.strftime("%Y-%m-%d %H:%M:%S")
         else:
@@ -37,8 +37,8 @@ class Session():
             end = self.end
         return {"start": start, "end": end, "label": self.label}
 
-    # Converts times as strings to datetime objects
     def load(self, data):
+        """Converts times as strings to datetime objects"""
         try:
             self.start = datetime.strptime(data["start"], "%Y-%m-%d %H:%M:%S")
         # Each session must have at least a valid start time
@@ -65,9 +65,11 @@ class Session():
             self.end = datetime.now()
             return []
 
-    # Ends the session on the day it was created and
-    # creates as many as necessary to reach the end time
     def endMultipleDaySession(self, end):
+        """
+        Ends the session on the day it was created and
+        creates as many as necessary to reach the end time
+        """
         sessions = []
         # End the current session at 1 second before midnight
         self.end = self.start.replace(
@@ -100,8 +102,8 @@ class Session():
             return self.end - self.start
 
 
-# The class that handles all of the instances tracked
 class Tracker():
+    """The class that handles all of the instances tracked"""
     def __init__(self):
         # a list of Session instances
         self.times = []
@@ -111,8 +113,8 @@ class Tracker():
         times = [time.output() for time in self.times]
         return {"times": times}
 
-    # Load the sessions read from the tracking file
     def load(self, data):
+        """Load the sessions read from the tracking file"""
         for time in data["times"]:
             session = Session()
             session.load(time)
@@ -130,8 +132,10 @@ class Tracker():
 
     def end(self):
         try:
-            # If the session extended over multiple days
-            # it will return an array of new sessions
+            """
+            If the session extended over multiple days
+            it will return an array of new sessions
+            """
             newSessions = self.times[-1].endSession()
         # Cannot end a session that has already ended
         except TimeError as e:
@@ -139,9 +143,9 @@ class Tracker():
         if len(newSessions):
             self.times.extend(newSessions)
 
-    # Get the total time tracked on each day that has one or more sessions
     @property
     def days(self):
+        """Gets the total time tracked on each day that has one or more sessions"""
         days = {}
         for time in self.times:
             try:
@@ -157,9 +161,9 @@ class Tracker():
             days[day] = str(days[day]).split(".")[0]
         return days
 
-    # Get the total time tracked on all days
     @property
     def total(self):
+        """Gets the total time tracked on all day"""
         total = timedelta(0)
         for time in self.times:
             total += (time.end - time.start)
@@ -176,40 +180,42 @@ def success(message):
     sys.exit(0)
 
 
-# Create a tracking file only if one does not already exist
-def init():
+# Helper functions used by the commands
+
+def initFile():
+    """Creates a tracking file only if one does not already exist"""
     if os.path.isfile(trackingFile):
         raise FileError("Tracking file already exists")
     with open(trackingFile, "w") as newFile:
         json.dump({"times": []}, newFile, indent=4)
 
 
-# Open the tracking file if it exists and return the data
-def read():
+def readFile():
+    """Opens the tracking file if it exists and return the data"""
     if not os.path.isfile(trackingFile):
         raise FileError("Tracking file does not exist")
     with open(trackingFile, "r") as readFile:
         return json.load(readFile)
 
 
-# Write data in json format to the specified file
-def store(data, file):
+def storeFile(data, file):
+    """Write data in json format to the specified file"""
     if not os.path.isfile(file):
         raise FileError("Tracking file does not exist")
     with open(file, "w") as writeFile:
         json.dump(data, writeFile, indent=4)
 
 
-# Output the total for each day tracked and the grand total to the console
-def show(days, total):
+def showTimes(days, total):
+    """Outputs the total for each day tracked and the grand total to the console"""
     print("\nDays:")
     for day, duration in days.items():
         print("{} - {}".format(day, duration))
     print("\nTotal:\n{}\n".format(total))
 
 
-# Export the total for each day tracked and the grand total to a file
-def export(days, total, file):
+def exportTimes(days, total, file):
+    """Export the total for each day tracked and the grand total to a file"""
     if os.path.isfile(file):
         raise FileError("Export file already exists")
     with open(file, "w") as writeFile:
@@ -219,31 +225,19 @@ def export(days, total, file):
         writeFile.write("\n")
         writeFile.write("Total:\n{}\n".format(total))
 
+# The functions called for each command
 
-commands = ["start", "stop", "init", "clear", "show", "export"]
-# Only accepts one of these arguments
-if len(sys.argv) < 2 or sys.argv[1] not in commands:
-    error("""
-    Usage:
-    init - initialize time tracking file
-    start <label>(optional) - start tracking time
-    stop - stop tracking time
-    clear - clear all tracked times
-    show - show the daily totals for tracked times
-    export <filename> - export the totals to a specified file
-    """)
-
-if sys.argv[1] == "init":
+def init():
     try:
-        init()
+        initFile()
     # If the tracking file already exists return the error
     except FileError as e:
         error(e)
     success("initialized")
 
-elif sys.argv[1] == "start":
+def start():
     try:
-        data = read()
+        data = readFile()
     # If the tracking file doesn't exist return the error
     except FileError as e:
         error(e)
@@ -258,12 +252,12 @@ elif sys.argv[1] == "start":
     # If the last session had not ended
     except TimeError as e:
         error(e)
-    store(tracker.output(), trackingFile)
+    storeFile(tracker.output(), trackingFile)
     success("started")
 
-elif sys.argv[1] == "stop":
+def stop():
     try:
-        data = read()
+        data = readFile()
     except FileError as e:
         error(e)
     tracker = Tracker()
@@ -273,39 +267,54 @@ elif sys.argv[1] == "stop":
     # If the last session has already ended
     except TimeError as e:
         error(e)
-    store(tracker.output(), trackingFile)
+    storeFile(tracker.output(), trackingFile)
     success("stopped")
 
-# Clear the tracking file altogether
-elif sys.argv[1] == "clear":
+def clear():
+    """Clears the tracking file altogether"""
     try:
-        store({"times": []}, trackingFile)
+        storeFile({"times": []}, trackingFile)
     except FileError as e:
         error(e)
     success("Cleared")
 
-elif sys.argv[1] == "show":
+def show():
     try:
-        data = read()
+        data = readFile()
     except FileError as e:
         error(e)
     tracker = Tracker()
     tracker.load(data)
-    show(tracker.days, tracker.total)
+    showTimes(tracker.days, tracker.total)
 
-elif sys.argv[1] == "export":
+def export():
     # Has a mandatory second argument - filename
     if len(sys.argv) < 3:
         error("Filename needed")
     try:
-        data = read()
+        data = readFile()
     except FileError as e:
         error(e)
     tracker = Tracker()
     tracker.load(data)
     try:
-        export(tracker.days, tracker.total, sys.argv[2])
+        exportTimes(tracker.days, tracker.total, sys.argv[2])
     except FileError as e:
         error(e)
     success("Exported")
 
+
+commands = {"start": start, "stop": stop, "init": init, "clear": clear, "show": show, "export":export}
+# Only accepts one of these arguments
+if len(sys.argv) < 2 or sys.argv[1] not in commands:
+    error("""
+    Usage:
+    init - initialize time tracking file
+    start <label>(optional) - start tracking time
+    stop - stop tracking time
+    clear - clear all tracked times
+    show - show the daily totals for tracked times
+    export <filename> - export the totals to a specified file
+    """)
+
+commands[sys.argv[1]]()
