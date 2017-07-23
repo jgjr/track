@@ -50,22 +50,22 @@ class Session():
             self.end = ""
         self.label = data["label"]
 
-    def startSession(self):
+    def start_session(self):
         self.start = datetime.now()
 
-    def endSession(self):
+    def end_session(self):
         if isinstance(self.end, datetime):
             raise TimeError("Session already ended")
         end = datetime.now()
         # If the sessions extended over multiple days
         if end.__format__("%Y-%m-%d") > self.start.__format__("%Y-%m-%d"):
-            newSessions = self.endMultipleDaySession(end)
+            newSessions = self.end_multiple_day_session(end)
             return newSessions
         else:
             self.end = datetime.now()
             return []
 
-    def endMultipleDaySession(self, end):
+    def end_multiple_day_session(self, end):
         """
         Ends the session on the day it was created and
         creates as many as necessary to reach the end time
@@ -127,7 +127,7 @@ class Tracker():
             raise TimeError("The last session has not ended")
         else:
             session = Session(label)
-            session.startSession()
+            session.start_session()
             self.times.append(session)
 
     def end(self):
@@ -136,7 +136,7 @@ class Tracker():
             If the session extended over multiple days
             it will return an array of new sessions
             """
-            newSessions = self.times[-1].endSession()
+            newSessions = self.times[-1].end_session()
         # Cannot end a session that has already ended
         except TimeError as e:
             raise TimeError("The last session has already ended")
@@ -185,7 +185,7 @@ def success(message):
 
 # Helper functions used by the commands
 
-def initFile():
+def init_file():
     """Creates a tracking file only if one does not already exist"""
     if os.path.isfile(trackingFile):
         raise FileError("Tracking file already exists")
@@ -193,15 +193,15 @@ def initFile():
         json.dump({"times": []}, newFile, indent=4)
 
 
-def readFile():
+def read_file():
     """Opens the tracking file if it exists and return the data"""
     if not os.path.isfile(trackingFile):
         raise FileError("Tracking file does not exist")
-    with open(trackingFile, "r") as readFile:
-        return json.load(readFile)
+    with open(trackingFile, "r") as read_file:
+        return json.load(read_file)
 
 
-def storeFile(data, file):
+def store_file(data, file):
     """Write data in json format to the specified file"""
     if not os.path.isfile(file):
         raise FileError("Tracking file does not exist")
@@ -209,7 +209,7 @@ def storeFile(data, file):
         json.dump(data, writeFile, indent=4)
 
 
-def showTimes(days, total):
+def show_times(days, total):
     """
     Outputs the total for each day tracked
     and the grand total to the console
@@ -220,7 +220,7 @@ def showTimes(days, total):
     print("\nTotal:\n{}\n".format(total))
 
 
-def exportTimes(days, total, file):
+def export_times(days, total, file):
     """Export the total for each day tracked and the grand total to a file"""
     if os.path.isfile(file):
         raise FileError("Export file already exists")
@@ -237,7 +237,7 @@ def exportTimes(days, total, file):
 
 def init():
     try:
-        initFile()
+        init_file()
     # If the tracking file already exists return the error
     except FileError as e:
         error(e)
@@ -246,7 +246,7 @@ def init():
 
 def start():
     try:
-        data = readFile()
+        data = read_file()
     # If the tracking file doesn't exist return the error
     except FileError as e:
         error(e)
@@ -261,13 +261,13 @@ def start():
     # If the last session had not ended
     except TimeError as e:
         error(e)
-    storeFile(tracker.output(), trackingFile)
+    store_file(tracker.output(), trackingFile)
     success("started")
 
 
 def stop():
     try:
-        data = readFile()
+        data = read_file()
     except FileError as e:
         error(e)
     tracker = Tracker()
@@ -277,14 +277,14 @@ def stop():
     # If the last session has already ended
     except TimeError as e:
         error(e)
-    storeFile(tracker.output(), trackingFile)
+    store_file(tracker.output(), trackingFile)
     success("stopped")
 
 
 def clear():
     """Clears the tracking file altogether"""
     try:
-        storeFile({"times": []}, trackingFile)
+        store_file({"times": []}, trackingFile)
     except FileError as e:
         error(e)
     success("Cleared")
@@ -292,12 +292,12 @@ def clear():
 
 def show():
     try:
-        data = readFile()
+        data = read_file()
     except FileError as e:
         error(e)
     tracker = Tracker()
     tracker.load(data)
-    showTimes(tracker.days, tracker.total)
+    show_times(tracker.days, tracker.total)
 
 
 def export():
@@ -305,29 +305,35 @@ def export():
     if len(sys.argv) < 3:
         error("Filename needed")
     try:
-        data = readFile()
+        data = read_file()
     except FileError as e:
         error(e)
     tracker = Tracker()
     tracker.load(data)
     try:
-        exportTimes(tracker.days, tracker.total, sys.argv[2])
+        export_times(tracker.days, tracker.total, sys.argv[2])
     except FileError as e:
         error(e)
     success("Exported")
 
 
 commands = {
-    "start": start,
-    "stop": stop,
-    "init": init,
-    "clear": clear,
-    "show": show,
-    "export": export
+    "start": {"function": start, "arguments": [2, 3]},
+    "stop": {"function": stop, "arguments": [2]},
+    "init": {"function": init, "arguments": [2]},
+    "clear": {"function": clear, "arguments": [2]},
+    "show": {"function": show, "arguments": [2]},
+    "export": {"function": export, "arguments": [3]},
 }
 
+try:
+    command = sys.argv[1]
+except IndexError:
+    error('Too few arguments')
+
 # Only accepts one of these arguments
-if len(sys.argv) < 2 or sys.argv[1] not in commands:
+if (command not in commands or 
+    len(sys.argv) not in commands[command]["arguments"]):
     error("""
     Usage:
     init - initialize time tracking file
@@ -338,5 +344,5 @@ if len(sys.argv) < 2 or sys.argv[1] not in commands:
     export <filename> - export the totals to a specified file
     """)
 
-commands[sys.argv[1]]()
+commands[command]["function"]()
 
