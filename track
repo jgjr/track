@@ -92,7 +92,7 @@ class Session():
         # The last session needs an end time of now
         sessions[-1].end = end
         return sessions
-    
+
     @property
     def duration(self):
         # Raises an error if the session has not ended
@@ -145,7 +145,10 @@ class Tracker():
 
     @property
     def days(self):
-        """Gets the total time tracked on each day that has one or more sessions"""
+        """
+        Gets the total time tracked on each day
+        that has one or more sessions
+        """
         days = {}
         for time in self.times:
             try:
@@ -207,7 +210,10 @@ def storeFile(data, file):
 
 
 def showTimes(days, total):
-    """Outputs the total for each day tracked and the grand total to the console"""
+    """
+    Outputs the total for each day tracked
+    and the grand total to the console
+    """
     print("\nDays:")
     for day, duration in days.items():
         print("{} - {}".format(day, duration))
@@ -225,7 +231,9 @@ def exportTimes(days, total, file):
         writeFile.write("\n")
         writeFile.write("Total:\n{}\n".format(total))
 
+
 # The functions called for each command
+
 
 def init():
     try:
@@ -234,6 +242,7 @@ def init():
     except FileError as e:
         error(e)
     success("initialized")
+
 
 def start():
     try:
@@ -255,6 +264,7 @@ def start():
     storeFile(tracker.output(), trackingFile)
     success("started")
 
+
 def stop():
     try:
         data = readFile()
@@ -270,6 +280,7 @@ def stop():
     storeFile(tracker.output(), trackingFile)
     success("stopped")
 
+
 def clear():
     """Clears the tracking file altogether"""
     try:
@@ -277,6 +288,7 @@ def clear():
     except FileError as e:
         error(e)
     success("Cleared")
+
 
 def show():
     try:
@@ -286,6 +298,7 @@ def show():
     tracker = Tracker()
     tracker.load(data)
     showTimes(tracker.days, tracker.total)
+
 
 def export():
     # Has a mandatory second argument - filename
@@ -304,7 +317,15 @@ def export():
     success("Exported")
 
 
-commands = {"start": start, "stop": stop, "init": init, "clear": clear, "show": show, "export":export}
+commands = {
+    "start": start,
+    "stop": stop,
+    "init": init,
+    "clear": clear,
+    "show": show,
+    "export": export
+}
+
 # Only accepts one of these arguments
 if len(sys.argv) < 2 or sys.argv[1] not in commands:
     error("""
@@ -318,3 +339,4 @@ if len(sys.argv) < 2 or sys.argv[1] not in commands:
     """)
 
 commands[sys.argv[1]]()
+
