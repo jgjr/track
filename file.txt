@@ -1,0 +1,10 @@
+Labels:
+unlabeled - 0:00:06
+other thing - 0:00:09
+thing - 0:00:04
+
+Days:
+2017-11-10 - 0:00:19
+
+Total:
+0:00:19

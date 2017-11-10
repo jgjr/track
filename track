@@ -165,6 +165,27 @@ class Tracker():
         return days
 
     @property
+    def labels(self):
+        """
+        Gets the total time tracked for each label
+        that has one or more sessions
+        """
+        labels = {}
+        for time in self.times:
+            try:
+                duration = time.duration
+            except TimeError as e:
+                error(e)
+            label = time.label
+            if label == "":
+                label = "No label"
+            if label in labels:
+                labels[label] += duration
+            else:
+                labels[label] = duration
+        return labels
+
+    @property
     def total(self):
         """Gets the total time tracked on all day"""
         total = timedelta(0)
@@ -209,22 +230,29 @@ def store_file(data, file):
         json.dump(data, writeFile, indent=4)
 
 
-def show_times(days, total):
+def show_times(labels, days, total):
     """
     Outputs the total for each day tracked
     and the grand total to the console
     """
+    print("\nLabels:")
+    for label, duration in labels.items():
+        print("{} - {}".format(label, duration))
     print("\nDays:")
     for day, duration in days.items():
         print("{} - {}".format(day, duration))
     print("\nTotal:\n{}\n".format(total))
 
 
-def export_times(days, total, file):
+def export_times(labels, days, total, file):
     """Export the total for each day tracked and the grand total to a file"""
     if os.path.isfile(file):
         raise FileError("Export file already exists")
     with open(file, "w") as writeFile:
+        writeFile.write("Labels:\n")
+        for label, duration in labels.items():
+            writeFile.write("{} - {}\n".format(label, duration))
+        writeFile.write("\n")
         writeFile.write("Days:\n")
         for day, duration in days.items():
             writeFile.write("{} - {}\n".format(day, duration))
@@ -297,7 +325,7 @@ def show():
         error(e)
     tracker = Tracker()
     tracker.load(data)
-    show_times(tracker.days, tracker.total)
+    show_times(tracker.labels, tracker.days, tracker.total)
 
 
 def export():
@@ -311,7 +339,7 @@ def export():
     tracker = Tracker()
     tracker.load(data)
     try:
-        export_times(tracker.days, tracker.total, sys.argv[2])
+        export_times(tracker.labels, tracker.days, tracker.total, sys.argv[2])
     except FileError as e:
         error(e)
     success("Exported")

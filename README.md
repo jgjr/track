@@ -36,6 +36,11 @@ The tracking file ('.tracking.json') contains a list of all the times tracked in
 ```
 The command 'track show' will output something like this:
 ```
+Labels:
+Task 1 - 3:47:13
+Task 2 - 3:49:46
+No label - 0:38:48
+
 Days:
 2017-07-21 - 7:36:59
 2017-07-22 - 0:38:48
